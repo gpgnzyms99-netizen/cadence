@@ -5,7 +5,7 @@ import { Workspace, Update, MediaTone } from '@/lib/types';
 import { parseDocumentToSlides } from '@/lib/segmenter';
 import { saveUpdate, saveWorkspace } from '@/lib/storage';
 import DeckShell from '../slideware/DeckShell';
-import { Layers, Play, CheckCircle2, Wand2, ArrowLeft, Upload, FileText, Loader2, FileSpreadsheet } from 'lucide-react';
+import { Layers, Play, CheckCircle2, Wand2, ArrowLeft, Upload, FileSpreadsheet, Sparkles, Edit3, Eye, FileText, Loader2, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 interface AdminEditorProps {
@@ -17,15 +17,15 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
   const [update, setUpdate] = useState<Update>(initialUpdate);
   const [workspace, setWorkspace] = useState<Workspace>(initialWorkspace);
   const [rawText, setRawText] = useState<string>(initialUpdate.rawContent || '');
-  const [activeTab, setActiveTab] = useState<'editor' | 'branding'>('editor');
-  const [selectedSlideIndex, setSelectedSlideIndex] = useState<number>(0);
+  const [activeStep, setActiveStep] = useState<'upload' | 'preview' | 'edit'>('upload');
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadStatus, setUploadStatus] = useState<string>('');
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-parse raw document into slides live as user types (§4.2 requirement)
+  // Auto-parse raw document into slides live as user edits
   useEffect(() => {
     const parsedSlides = parseDocumentToSlides(rawText, update.id);
     setUpdate((prev) => ({
@@ -54,7 +54,8 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
     if (!file) return;
 
     setUploading(true);
-    setUploadStatus(`Processing ${file.name} with Gemini AI...`);
+    setUploadedFileName(file.name);
+    setUploadStatus(`Analyzing and processing ${file.name} with Gemini AI...`);
 
     try {
       const formData = new FormData();
@@ -68,15 +69,17 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
       const data = await res.json();
       if (res.ok && data.success && data.markdown) {
         setRawText(data.markdown);
-        setUploadStatus(`Successfully generated slideware from ${file.name}`);
+        setUploadStatus(`Slideware generated successfully! Transitioning to preview...`);
+        setTimeout(() => {
+          setActiveStep('preview');
+        }, 1000);
       } else {
-        setUploadStatus('Document processing failed.');
+        setUploadStatus('Document processing failed. Please try again.');
       }
     } catch (err) {
       setUploadStatus('Upload error.');
     } finally {
       setUploading(false);
-      setTimeout(() => setUploadStatus(''), 4000);
     }
   };
 
@@ -88,236 +91,178 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
     }
   };
 
-  const handleSlidePromptChange = (index: number, prompt: string) => {
-    const updatedSlides = [...update.slides];
-    if (updatedSlides[index]) {
-      updatedSlides[index].mediaPrompt = prompt;
-      setUpdate({ ...update, slides: updatedSlides });
-    }
-  };
-
   return (
     <div className="w-screen h-screen flex flex-col bg-[#090d16] text-white overflow-hidden font-sans">
       
-      {/* Top Admin Header Bar */}
+      {/* Streamlined Workflow Header */}
       <header className="h-16 px-6 flex items-center justify-between border-b border-white/10 bg-slate-950/90 backdrop-blur-md z-30">
         <div className="flex items-center gap-4">
           <Link href={`/${workspace.slug}`} className="p-2 rounded-lg bg-slate-900 text-slate-400 hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div className="flex items-center gap-2 font-semibold text-sm">
-            <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
+            <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-600/30">
               <Layers className="w-3.5 h-3.5" />
             </div>
-            <span>Cadence Studio</span>
-            <span className="text-xs font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-              {workspace.slug}/{update.period}
-            </span>
+            <span>Cadence Creator</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-medium">
-            <button
-              onClick={() => setActiveTab('editor')}
-              className={`px-3 py-1.5 rounded-lg transition-colors ${activeTab === 'editor' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              Document Editor
-            </button>
-            <button
-              onClick={() => setActiveTab('branding')}
-              className={`px-3 py-1.5 rounded-lg transition-colors ${activeTab === 'branding' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              Workspace Branding
-            </button>
-          </div>
+        {/* 3-Step Workflow Stepper Bar */}
+        <div className="flex items-center bg-slate-900 p-1 rounded-2xl border border-slate-800/80 text-xs font-medium">
+          <button
+            onClick={() => setActiveStep('upload')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
+              activeStep === 'upload' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span className="w-4 h-4 rounded-full bg-white/20 text-[10px] flex items-center justify-center font-mono">1</span>
+            <span>Upload File</span>
+          </button>
 
           <button
-            onClick={handlePublish}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white shadow-lg shadow-emerald-600/20 transition-all"
+            onClick={() => setActiveStep('preview')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
+              activeStep === 'preview' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+            }`}
           >
-            {isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
-            <span>{isSaved ? 'Published!' : 'Publish Update'}</span>
+            <span className="w-4 h-4 rounded-full bg-white/20 text-[10px] flex items-center justify-center font-mono">2</span>
+            <span>Preview Slideware</span>
+          </button>
+
+          <button
+            onClick={() => setActiveStep('edit')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
+              activeStep === 'edit' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span className="w-4 h-4 rounded-full bg-white/20 text-[10px] flex items-center justify-center font-mono">3</span>
+            <span>Edit & Publish</span>
           </button>
         </div>
+
+        {/* Publish Action Button */}
+        <button
+          onClick={handlePublish}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white shadow-lg shadow-emerald-600/20 transition-all"
+        >
+          {isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+          <span>{isSaved ? 'Published Live!' : 'Publish Update'}</span>
+        </button>
       </header>
 
-      {/* Editor & Live Split View */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main Workflow View Surface */}
+      <div className="flex-1 overflow-hidden relative">
         
-        {/* Left Control Column */}
-        <div className="w-full lg:w-1/2 h-full flex flex-col border-r border-white/10 bg-slate-950/40">
-          {activeTab === 'editor' ? (
-            <div className="flex-1 flex flex-col p-6 overflow-y-auto space-y-6">
-              
-              {/* Document Upload & Gemini AI Synth Bar */}
-              <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-3 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-indigo-300">
-                    <FileSpreadsheet className="w-4 h-4 text-indigo-400" />
-                    <span>AI Document Synthesizer (PDF / Word / Excel / CSV / PPT)</span>
-                  </div>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                    accept=".pdf,.docx,.doc,.csv,.xlsx,.xls,.pptx,.ppt,.txt"
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-xs font-medium text-white shadow-md transition-colors"
-                  >
-                    {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                    <span>{uploading ? 'Processing...' : 'Upload Document'}</span>
-                  </button>
-                </div>
+        {/* STEP 1: UPLOAD INPUT FILES */}
+        {activeStep === 'upload' && (
+          <div className="w-full h-full flex items-center justify-center p-6 bg-[#090d16]">
+            <div className="max-w-xl w-full text-center space-y-8 p-10 rounded-3xl bg-slate-900/60 border border-slate-800 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
+              <div className="w-20 h-20 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto shadow-xl shadow-indigo-950/50">
+                {uploading ? <Loader2 className="w-10 h-10 animate-spin" /> : <Sparkles className="w-10 h-10" />}
+              </div>
+
+              <div className="space-y-3">
+                <h2 className="text-2xl font-bold tracking-tight text-white">Upload Executive Document</h2>
+                <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+                  Upload your PDF, Word document, Excel sheet, CSV, or PowerPoint file. Gemini AI will analyze and convert it into agency-grade slideware automatically.
+                </p>
+              </div>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept=".pdf,.docx,.doc,.csv,.xlsx,.xls,.pptx,.ppt,.txt"
+                className="hidden"
+              />
+
+              <div className="pt-2 space-y-4">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full py-4 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-sm shadow-xl shadow-indigo-600/25 transition-all flex items-center justify-center gap-2 group"
+                >
+                  <Upload className="w-4 h-4 transition-transform group-hover:-translate-y-0.5" />
+                  <span>{uploading ? 'Processing with Gemini AI...' : 'Select Document File'}</span>
+                </button>
+
                 {uploadStatus && (
-                  <p className="text-xs text-indigo-200 animate-pulse font-mono">{uploadStatus}</p>
+                  <p className="text-xs font-mono text-indigo-300 animate-pulse">{uploadStatus}</p>
                 )}
+
+                <div className="pt-4 border-t border-slate-800/80 flex items-center justify-center gap-4 text-[11px] font-mono text-slate-500">
+                  <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-indigo-400" /> PDF & Word</span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1"><FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> Excel & CSV</span>
+                  <span>•</span>
+                  <span>PPT Presentations</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2: PREVIEW SLIDEWARE */}
+        {activeStep === 'preview' && (
+          <div className="w-full h-full relative">
+            <DeckShell update={update} workspace={workspace} allUpdates={[update]} />
+          </div>
+        )}
+
+        {/* STEP 3: EDIT & PUBLISH */}
+        {activeStep === 'edit' && (
+          <div className="w-full h-full flex overflow-hidden">
+            {/* Left Quick Editor Drawer */}
+            <div className="w-full lg:w-1/2 h-full p-6 flex flex-col space-y-6 bg-slate-950/60 border-r border-white/10 overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-white">Refine Update Content</h3>
+                  <p className="text-xs text-slate-400">Make quick adjustments to the generated text before publishing.</p>
+                </div>
+                <button
+                  onClick={handlePublish}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white shadow-md"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Publish Now</span>
+                </button>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-mono text-slate-400 uppercase tracking-wider">Update Details</label>
+                <span className="text-xs font-mono text-slate-400 uppercase">Period Tag & Title</span>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-[11px] text-slate-500">Period Tag</span>
-                    <input
-                      type="text"
-                      value={update.period}
-                      onChange={(e) => setUpdate({ ...update, period: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs font-mono text-white outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500">Update Title</span>
-                    <input
-                      type="text"
-                      value={update.title}
-                      onChange={(e) => setUpdate({ ...update, title: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white outline-none focus:border-indigo-500"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={update.period}
+                    onChange={(e) => setUpdate({ ...update, period: e.target.value })}
+                    className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-white outline-none focus:border-indigo-500"
+                  />
+                  <input
+                    type="text"
+                    value={update.title}
+                    onChange={(e) => setUpdate({ ...update, title: e.target.value })}
+                    className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white outline-none focus:border-indigo-500"
+                  />
                 </div>
               </div>
 
-              {/* Document Block Editor Input */}
               <div className="flex-1 flex flex-col space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-mono text-slate-400 uppercase tracking-wider">Structured Prose Document</label>
-                  <span className="text-[11px] font-mono text-indigo-400">Live Auto-Segmenter Active</span>
-                </div>
+                <span className="text-xs font-mono text-slate-400 uppercase">Structured Prose Editor</span>
                 <textarea
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
-                  placeholder="Type your executive update prose here or upload a document above..."
-                  className="flex-1 min-h-[300px] w-full p-4 bg-slate-900/80 border border-slate-800 rounded-2xl text-sm font-mono text-slate-200 placeholder-slate-600 outline-none focus:border-indigo-500 resize-none leading-relaxed"
+                  className="flex-1 min-h-[350px] w-full p-4 bg-slate-900/90 border border-slate-800 rounded-2xl text-sm font-mono text-slate-200 outline-none focus:border-indigo-500 resize-none leading-relaxed"
                 />
               </div>
-
-              {/* Media & Slide Art Direction Overrides */}
-              <div className="space-y-3 pt-4 border-t border-slate-800/60">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Wand2 className="w-3.5 h-3.5 text-indigo-400" /> Slide Art Direction & Tone
-                  </span>
-                  <span className="text-xs text-slate-500">{update.slides.length} Slides Generated</span>
-                </div>
-
-                <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                  {update.slides.map((s, idx) => (
-                    <div
-                      key={s.id}
-                      onClick={() => setSelectedSlideIndex(idx)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                        selectedSlideIndex === idx ? 'bg-indigo-950/50 border-indigo-500/50' : 'bg-slate-900 border-slate-800'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-xs mb-2">
-                        <span className="font-semibold text-white">Slide {idx + 1}: {s.title}</span>
-                        <span className="font-mono text-[10px] text-indigo-300 uppercase px-2 py-0.5 rounded bg-indigo-950 border border-indigo-800">
-                          {s.archetype}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <span className="text-[10px] text-slate-500">Visual Tone</span>
-                          <select
-                            value={s.tone || 'editorial'}
-                            onChange={(e) => handleSlideToneChange(idx, e.target.value as MediaTone)}
-                            className="w-full mt-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[11px] text-slate-300 outline-none"
-                          >
-                            <option value="editorial">Editorial</option>
-                            <option value="corporate">Corporate</option>
-                            <option value="abstract">Abstract</option>
-                            <option value="data-driven">Data-Driven</option>
-                          </select>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-500">Prompt Override</span>
-                          <input
-                            type="text"
-                            value={s.mediaPrompt || ''}
-                            onChange={(e) => handleSlidePromptChange(idx, e.target.value)}
-                            className="w-full mt-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[11px] text-slate-300 outline-none truncate"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
             </div>
-          ) : (
-            <div className="p-6 space-y-6">
-              <h3 className="text-lg font-bold text-white">Workspace Brand Configuration</h3>
-              <p className="text-xs text-slate-400">
-                Configure brand attributes globally so every executive update renders on-brand across all slide archetypes.
-              </p>
 
-              <div className="space-y-4 pt-2">
-                <div>
-                  <label className="text-xs text-slate-400">Company Name</label>
-                  <input
-                    type="text"
-                    value={workspace.brand.name}
-                    onChange={(e) => setWorkspace({ ...workspace, brand: { ...workspace.brand, name: e.target.value } })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-slate-400">Primary Palette</label>
-                    <input
-                      type="color"
-                      value={workspace.brand.palette.primary}
-                      onChange={(e) => setWorkspace({ ...workspace, brand: { ...workspace.brand, palette: { ...workspace.brand.palette, primary: e.target.value } } })}
-                      className="w-full mt-1 h-10 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400">Accent Color</label>
-                    <input
-                      type="color"
-                      value={workspace.brand.palette.accent}
-                      onChange={(e) => setWorkspace({ ...workspace, brand: { ...workspace.brand, palette: { ...workspace.brand.palette, accent: e.target.value } } })}
-                      className="w-full mt-1 h-10 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
+            {/* Right Live Preview Pane */}
+            <div className="hidden lg:block lg:w-1/2 h-full relative">
+              <DeckShell update={update} workspace={workspace} allUpdates={[update]} />
             </div>
-          )}
-        </div>
-
-        {/* Right Split View */}
-        <div className="hidden lg:block lg:w-1/2 h-full relative">
-          <DeckShell update={update} workspace={workspace} allUpdates={[update]} />
-        </div>
+          </div>
+        )}
 
       </div>
     </div>
