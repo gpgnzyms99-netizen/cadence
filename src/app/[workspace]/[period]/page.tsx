@@ -1,27 +1,34 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, use } from 'react';
 import { getWorkspace, getUpdatesForWorkspace, getUpdateByPeriod } from '@/lib/storage';
 import { Update, Workspace } from '@/lib/types';
 import DeckShell from '@/components/slideware/DeckShell';
 import PasscodeGate from '@/components/PasscodeGate';
 
-export default function RootPage() {
+interface PageProps {
+  params: Promise<{ workspace: string; period: string }>;
+}
+
+export default function PeriodPage({ params }: PageProps) {
+  const resolvedParams = use(params);
+  const { workspace: workspaceSlug, period } = resolvedParams;
+
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [update, setUpdate] = useState<Update | null>(null);
   const [allUpdates, setAllUpdates] = useState<Update[]>([]);
 
   useEffect(() => {
-    const ws = getWorkspace('ttc');
-    const updates = getUpdatesForWorkspace('ttc');
-    const latest = getUpdateByPeriod('ttc');
+    const ws = getWorkspace(workspaceSlug);
+    const updates = getUpdatesForWorkspace(workspaceSlug);
+    const foundUpdate = getUpdateByPeriod(workspaceSlug, period);
     setWorkspace(ws);
     setAllUpdates(updates);
-    setUpdate(latest);
-  }, []);
+    setUpdate(foundUpdate);
+  }, [workspaceSlug, period]);
 
   if (!workspace || !update) {
-    return <div className="min-h-screen bg-[#090d16] text-white flex items-center justify-center">Loading Cadence...</div>;
+    return <div className="min-h-screen bg-[#090d16] text-white flex items-center justify-center">Update period not found.</div>;
   }
 
   return (
