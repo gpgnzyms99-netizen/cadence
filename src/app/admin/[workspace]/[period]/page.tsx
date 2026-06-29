@@ -4,6 +4,7 @@ import React, { useEffect, useState, use } from 'react';
 import { getWorkspace, getUpdateByPeriod } from '@/lib/storage';
 import { Update, Workspace } from '@/lib/types';
 import AdminEditor from '@/components/admin/AdminEditor';
+import AdminPasscodeGate from '@/components/admin/AdminPasscodeGate';
 
 interface PageProps {
   params: Promise<{ workspace: string; period: string }>;
@@ -27,5 +28,9 @@ export default function AdminSpecificUpdatePage({ params }: PageProps) {
     return <div className="min-h-screen bg-[#090d16] text-white flex items-center justify-center">Update not found in Studio.</div>;
   }
 
-  return <AdminEditor initialUpdate={update} initialWorkspace={workspace} />;
+  return (
+    <AdminPasscodeGate>
+      <AdminEditor initialUpdate={update} initialWorkspace={workspace} />
+    </AdminPasscodeGate>
+  );
 }

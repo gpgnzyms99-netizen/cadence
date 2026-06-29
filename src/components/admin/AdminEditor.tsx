@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Workspace, Update, Slide, MediaTone } from '@/lib/types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Workspace, Update, MediaTone } from '@/lib/types';
 import { parseDocumentToSlides } from '@/lib/segmenter';
 import { saveUpdate, saveWorkspace } from '@/lib/storage';
 import DeckShell from '../slideware/DeckShell';
-import { Layers, Play, CheckCircle2, Sliders, RefreshCw, Sparkles, Wand2, ArrowLeft } from 'lucide-react';
+import { Layers, Play, CheckCircle2, Wand2, ArrowLeft, Upload, FileText, Loader2, FileSpreadsheet } from 'lucide-react';
 import Link from 'next/link';
 
 interface AdminEditorProps {
@@ -20,6 +20,10 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
   const [activeTab, setActiveTab] = useState<'editor' | 'branding'>('editor');
   const [selectedSlideIndex, setSelectedSlideIndex] = useState<number>(0);
   const [isSaved, setIsSaved] = useState<boolean>(false);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-parse raw document into slides live as user types (§4.2 requirement)
   useEffect(() => {
@@ -43,6 +47,37 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
     setUpdate(publishedUpdate);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setUploadStatus(`Processing ${file.name} with Gemini AI...`);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/process-document', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.markdown) {
+        setRawText(data.markdown);
+        setUploadStatus(`Successfully generated slideware from ${file.name}`);
+      } else {
+        setUploadStatus('Document processing failed.');
+      }
+    } catch (err) {
+      setUploadStatus('Upload error.');
+    } finally {
+      setUploading(false);
+      setTimeout(() => setUploadStatus(''), 4000);
+    }
   };
 
   const handleSlideToneChange = (index: number, tone: MediaTone) => {
@@ -110,11 +145,39 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
       {/* Editor & Live Split View */}
       <div className="flex-1 flex overflow-hidden">
         
-        {/* Left Control Column (Editor or Branding) */}
+        {/* Left Control Column */}
         <div className="w-full lg:w-1/2 h-full flex flex-col border-r border-white/10 bg-slate-950/40">
           {activeTab === 'editor' ? (
             <div className="flex-1 flex flex-col p-6 overflow-y-auto space-y-6">
               
+              {/* Document Upload & Gemini AI Synth Bar */}
+              <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-3 relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-indigo-300">
+                    <FileSpreadsheet className="w-4 h-4 text-indigo-400" />
+                    <span>AI Document Synthesizer (PDF / Word / Excel / CSV / PPT)</span>
+                  </div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    accept=".pdf,.docx,.doc,.csv,.xlsx,.xls,.pptx,.ppt,.txt"
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-xs font-medium text-white shadow-md transition-colors"
+                  >
+                    {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    <span>{uploading ? 'Processing...' : 'Upload Document'}</span>
+                  </button>
+                </div>
+                {uploadStatus && (
+                  <p className="text-xs text-indigo-200 animate-pulse font-mono">{uploadStatus}</p>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <label className="text-xs font-mono text-slate-400 uppercase tracking-wider">Update Details</label>
                 <div className="grid grid-cols-2 gap-4">
@@ -148,7 +211,7 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
                 <textarea
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
-                  placeholder="Type your executive update prose here..."
+                  placeholder="Type your executive update prose here or upload a document above..."
                   className="flex-1 min-h-[300px] w-full p-4 bg-slate-900/80 border border-slate-800 rounded-2xl text-sm font-mono text-slate-200 placeholder-slate-600 outline-none focus:border-indigo-500 resize-none leading-relaxed"
                 />
               </div>
@@ -209,7 +272,6 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
 
             </div>
           ) : (
-            /* Workspace Branding Tab (§4.2 requirement) */
             <div className="p-6 space-y-6">
               <h3 className="text-lg font-bold text-white">Workspace Brand Configuration</h3>
               <p className="text-xs text-slate-400">
@@ -252,7 +314,7 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
           )}
         </div>
 
-        {/* Right Split View — Live Rendered Slideware Pane (§4.2 requirement) */}
+        {/* Right Split View */}
         <div className="hidden lg:block lg:w-1/2 h-full relative">
           <DeckShell update={update} workspace={workspace} allUpdates={[update]} />
         </div>
