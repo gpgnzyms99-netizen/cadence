@@ -83,14 +83,6 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
     }
   };
 
-  const handleSlideToneChange = (index: number, tone: MediaTone) => {
-    const updatedSlides = [...update.slides];
-    if (updatedSlides[index]) {
-      updatedSlides[index].tone = tone;
-      setUpdate({ ...update, slides: updatedSlides });
-    }
-  };
-
   return (
     <div className="w-screen h-screen flex flex-col bg-[#090d16] text-white overflow-hidden font-sans">
       
@@ -206,7 +198,7 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
         {/* STEP 2: PREVIEW SLIDEWARE */}
         {activeStep === 'preview' && (
           <div className="w-full h-full relative">
-            <DeckShell update={update} workspace={workspace} allUpdates={[update]} />
+            <DeckShell update={update} workspace={workspace} allUpdates={[update]} isPreview={true} />
           </div>
         )}
 
@@ -259,7 +251,7 @@ export default function AdminEditor({ initialUpdate, initialWorkspace }: AdminEd
 
             {/* Right Live Preview Pane */}
             <div className="hidden lg:block lg:w-1/2 h-full relative">
-              <DeckShell update={update} workspace={workspace} allUpdates={[update]} />
+              <DeckShell update={update} workspace={workspace} allUpdates={[update]} isPreview={true} />
             </div>
           </div>
         )}

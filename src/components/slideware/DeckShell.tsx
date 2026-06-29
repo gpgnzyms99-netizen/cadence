@@ -17,9 +17,10 @@ interface DeckShellProps {
   workspace: Workspace;
   allUpdates: Update[];
   currentSlideSlug?: string;
+  isPreview?: boolean;
 }
 
-export default function DeckShell({ update, workspace, allUpdates, currentSlideSlug }: DeckShellProps) {
+export default function DeckShell({ update, workspace, allUpdates, currentSlideSlug, isPreview = false }: DeckShellProps) {
   const router = useRouter();
   const slides = update.slides || [];
   
@@ -32,18 +33,25 @@ export default function DeckShell({ update, workspace, allUpdates, currentSlideS
   const [copied, setCopied] = useState(false);
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
 
+  // Keep index within bounds if slides length changes dynamically
+  useEffect(() => {
+    if (currentIndex >= slides.length && slides.length > 0) {
+      setCurrentIndex(slides.length - 1);
+    }
+  }, [slides.length, currentIndex]);
+
   const currentSlide = slides[currentIndex] || slides[0];
 
   const goToSlide = useCallback((index: number) => {
     if (index >= 0 && index < slides.length) {
       setCurrentIndex(index);
       const targetSlide = slides[index];
-      if (targetSlide) {
-        // Update URL slug cleanly without full page refresh
+      if (targetSlide && !isPreview) {
+        // Update URL slug cleanly without full page refresh only in live viewer
         window.history.replaceState(null, '', `/${workspace.slug}/${update.period}/${targetSlide.slug}`);
       }
     }
-  }, [slides, workspace.slug, update.period]);
+  }, [slides, workspace.slug, update.period, isPreview]);
 
   const nextSlide = useCallback(() => {
     if (currentIndex < slides.length - 1) goToSlide(currentIndex + 1);
@@ -80,6 +88,7 @@ export default function DeckShell({ update, workspace, allUpdates, currentSlideS
   };
 
   const renderSlideContent = (slide: Slide) => {
+    if (!slide) return null;
     switch (slide.archetype) {
       case 'cover':
         return <CoverSlide slide={slide} brand={workspace.brand} period={update.period} />;
@@ -101,10 +110,10 @@ export default function DeckShell({ update, workspace, allUpdates, currentSlideS
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#090d16] text-white flex flex-col font-sans select-none">
+    <div className="relative w-full h-full min-h-[500px] overflow-hidden bg-[#090d16] text-white flex flex-col font-sans select-none">
       
       {/* Header Minimal Chrome */}
-      <header className="relative z-50 w-full h-16 px-6 flex items-center justify-between border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+      <header className="relative z-50 w-full h-16 px-6 flex items-center justify-between border-b border-white/10 bg-slate-950/80 backdrop-blur-xl shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 font-semibold text-sm text-white">
             <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-600/30">
@@ -133,7 +142,7 @@ export default function DeckShell({ update, workspace, allUpdates, currentSlideS
                     key={u.id}
                     onClick={() => {
                       setShowPeriodDropdown(false);
-                      router.push(`/${workspace.slug}/${u.period}`);
+                      if (!isPreview) router.push(`/${workspace.slug}/${u.period}`);
                     }}
                     className={`w-full text-left px-3 py-2 text-xs font-mono flex items-center justify-between hover:bg-indigo-600/20 transition-colors ${
                       u.period === update.period ? 'text-indigo-400 font-bold bg-indigo-950/40' : 'text-slate-300'
@@ -170,11 +179,13 @@ export default function DeckShell({ update, workspace, allUpdates, currentSlideS
 
       {/* Main Slide Viewing Surface */}
       <main className="flex-1 w-full h-full relative overflow-hidden flex items-center justify-center">
-        {currentSlide && renderSlideContent(currentSlide)}
+        {currentSlide ? renderSlideContent(currentSlide) : (
+          <div className="text-slate-500 text-sm">No slides available</div>
+        )}
       </main>
 
       {/* Bottom Footer Navigation Bar */}
-      <footer className="relative z-50 w-full h-16 px-6 flex items-center justify-between border-t border-white/10 bg-slate-950/80 backdrop-blur-xl">
+      <footer className="relative z-50 w-full h-16 px-6 flex items-center justify-between border-t border-white/10 bg-slate-950/80 backdrop-blur-xl shrink-0">
         <div className="text-xs font-mono text-slate-400 flex items-center gap-2">
           <span>SLIDE {currentIndex + 1} OF {slides.length}</span>
           <span>•</span>
